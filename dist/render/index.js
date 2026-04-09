@@ -339,7 +339,8 @@ function renderExpanded(ctx, terminalWidth = null) {
             const secondLine = renderElementLine(ctx, nextElement);
             if (firstLine && secondLine) {
                 const combinedLine = `${firstLine}${combinablePair.separator}${secondLine}`;
-                const canCombine = !terminalWidth || visualLength(combinedLine) <= terminalWidth;
+                const isUnknownWidth = terminalWidth === UNKNOWN_TERMINAL_WIDTH;
+                const canCombine = !terminalWidth || isUnknownWidth || visualLength(combinedLine) <= terminalWidth;
                 if (canCombine) {
                     lines.push({ line: combinedLine, isActivity: false });
                 }
@@ -413,7 +414,8 @@ export function render(ctx) {
         lines.push(...activityLines);
     }
     const physicalLines = lines.flatMap(line => line.split('\n'));
-    const visibleLines = physicalLines.flatMap(line => wrapLineToWidth(line, terminalWidth));
+    const effectiveWidth = terminalWidth === UNKNOWN_TERMINAL_WIDTH ? Number.MAX_SAFE_INTEGER : terminalWidth;
+    const visibleLines = physicalLines.flatMap(line => wrapLineToWidth(line, effectiveWidth));
     for (const line of visibleLines) {
         const outputLine = `${RESET}${line}`;
         console.log(outputLine);
