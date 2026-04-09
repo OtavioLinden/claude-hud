@@ -311,6 +311,23 @@ function makeSeparator(length: number): string {
 
 const ACTIVITY_ELEMENTS = new Set<HudElement>(['tools', 'agents', 'todos']);
 
+/**
+ * Pairs of elements that should be combined on the same line in expanded mode
+ * when they are adjacent in elementOrder. The separator controls how they join.
+ */
+const COMBINABLE_PAIRS: Array<{ a: HudElement; b: HudElement; separator: string }> = [
+  { a: 'project', b: 'context', separator: ' │ ' },
+  { a: 'context', b: 'usage', separator: ' │ ' },
+  { a: 'environment', b: 'tools', separator: ' | ' },
+];
+
+function findCombinablePair(elementA: HudElement, elementB: HudElement): { separator: string } | null {
+  const pair = COMBINABLE_PAIRS.find(
+    (p) => (p.a === elementA && p.b === elementB) || (p.a === elementB && p.b === elementA),
+  );
+  return pair ? { separator: pair.separator } : null;
+}
+
 function collectActivityLines(ctx: RenderContext): string[] {
   const activityLines: string[] = [];
   const display = ctx.config?.display;
@@ -385,10 +402,11 @@ function renderExpanded(ctx: RenderContext, terminalWidth: number | null = null)
     }
 
     const nextElement = elementOrder[index + 1];
-    if (
-      (element === 'context' && nextElement === 'usage' && !seen.has('usage'))
-      || (element === 'usage' && nextElement === 'context' && !seen.has('context'))
-    ) {
+    const combinablePair = nextElement && !seen.has(nextElement)
+      ? findCombinablePair(element, nextElement)
+      : null;
+
+    if (combinablePair) {
       seen.add(element);
       seen.add(nextElement);
 
@@ -396,7 +414,7 @@ function renderExpanded(ctx: RenderContext, terminalWidth: number | null = null)
       const secondLine = renderElementLine(ctx, nextElement);
 
       if (firstLine && secondLine) {
-        const combinedLine = `${firstLine} │ ${secondLine}`;
+        const combinedLine = `${firstLine}${combinablePair.separator}${secondLine}`;
         const canCombine = !terminalWidth || visualLength(combinedLine) <= terminalWidth;
 
         if (canCombine) {

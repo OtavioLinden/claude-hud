@@ -254,6 +254,19 @@ function makeSeparator(length) {
     return dim('─'.repeat(Math.max(length, 1)));
 }
 const ACTIVITY_ELEMENTS = new Set(['tools', 'agents', 'todos']);
+/**
+ * Pairs of elements that should be combined on the same line in expanded mode
+ * when they are adjacent in elementOrder. The separator controls how they join.
+ */
+const COMBINABLE_PAIRS = [
+    { a: 'project', b: 'context', separator: ' │ ' },
+    { a: 'context', b: 'usage', separator: ' │ ' },
+    { a: 'environment', b: 'tools', separator: ' | ' },
+];
+function findCombinablePair(elementA, elementB) {
+    const pair = COMBINABLE_PAIRS.find((p) => (p.a === elementA && p.b === elementB) || (p.a === elementB && p.b === elementA));
+    return pair ? { separator: pair.separator } : null;
+}
 function collectActivityLines(ctx) {
     const activityLines = [];
     const display = ctx.config?.display;
@@ -316,14 +329,16 @@ function renderExpanded(ctx, terminalWidth = null) {
             continue;
         }
         const nextElement = elementOrder[index + 1];
-        if ((element === 'context' && nextElement === 'usage' && !seen.has('usage'))
-            || (element === 'usage' && nextElement === 'context' && !seen.has('context'))) {
+        const combinablePair = nextElement && !seen.has(nextElement)
+            ? findCombinablePair(element, nextElement)
+            : null;
+        if (combinablePair) {
             seen.add(element);
             seen.add(nextElement);
             const firstLine = renderElementLine(ctx, element);
             const secondLine = renderElementLine(ctx, nextElement);
             if (firstLine && secondLine) {
-                const combinedLine = `${firstLine} │ ${secondLine}`;
+                const combinedLine = `${firstLine}${combinablePair.separator}${secondLine}`;
                 const canCombine = !terminalWidth || visualLength(combinedLine) <= terminalWidth;
                 if (canCombine) {
                     lines.push({ line: combinedLine, isActivity: false });
