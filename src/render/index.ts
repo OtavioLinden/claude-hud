@@ -413,21 +413,47 @@ function renderExpanded(ctx: RenderContext, terminalWidth: number | null = null)
       const firstLine = renderElementLine(ctx, element);
       const secondLine = renderElementLine(ctx, nextElement);
 
+      let resultLine: string | null = null;
       if (firstLine && secondLine) {
-        const combinedLine = `${firstLine}${combinablePair.separator}${secondLine}`;
+        resultLine = `${firstLine}${combinablePair.separator}${secondLine}`;
+      } else {
+        resultLine = firstLine ?? secondLine ?? null;
+      }
+
+      // Chain: check if the next-next element can also be combined with nextElement
+      let lastChainedElement = nextElement;
+      let chainOffset = 2;
+      while (resultLine) {
+        const nextNextElement = elementOrder[index + chainOffset];
+        if (!nextNextElement || seen.has(nextNextElement)) break;
+        const chainPair = findCombinablePair(lastChainedElement, nextNextElement);
+        if (!chainPair) break;
+        const thirdLine = renderElementLine(ctx, nextNextElement);
+        if (!thirdLine) break;
+        seen.add(nextNextElement);
+        resultLine = `${resultLine}${chainPair.separator}${thirdLine}`;
+        lastChainedElement = nextNextElement;
+        chainOffset += 1;
+      }
+
+      if (resultLine) {
         const isUnknownWidth = terminalWidth === UNKNOWN_TERMINAL_WIDTH;
-        const canCombine = !terminalWidth || isUnknownWidth || visualLength(combinedLine) <= terminalWidth;
+        const canCombine = !terminalWidth || isUnknownWidth || visualLength(resultLine) <= terminalWidth;
 
         if (canCombine) {
-          lines.push({ line: combinedLine, isActivity: false });
+          lines.push({ line: resultLine, isActivity: false });
         } else {
-          lines.push({ line: firstLine, isActivity: false });
-          lines.push({ line: secondLine, isActivity: false });
+          // Fall back to rendering each element on its own line
+          const fallbackElements = [element, nextElement, ...Array.from(seen).filter(
+            e => e !== element && e !== nextElement && elementOrder.indexOf(e) > index && elementOrder.indexOf(e) < index + chainOffset
+          )];
+          for (const fb of [element, ...elementOrder.slice(index + 1, index + chainOffset)]) {
+            const fbLine = renderElementLine(ctx, fb);
+            if (fbLine) {
+              lines.push({ line: fbLine, isActivity: false });
+            }
+          }
         }
-      } else if (firstLine) {
-        lines.push({ line: firstLine, isActivity: false });
-      } else if (secondLine) {
-        lines.push({ line: secondLine, isActivity: false });
       }
 
       continue;
